@@ -8,7 +8,8 @@ export class BlockFactory {
       '#FFE66D', // Yellow
       '#FF9F1C', // Orange
       '#9B5DE5', // Purple
-      '#F15BB5'  // Pink
+      '#3A86FF', // Bright Blue
+      '#8AC926'  // Lime Green
     ];
   }
 

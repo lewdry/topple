@@ -29,7 +29,7 @@ export class Renderer {
 
     render() {
         // Clear canvas
-        this.ctx.fillStyle = '#f0f4f8';
+        this.ctx.fillStyle = '#e6edf3';
         this.ctx.fillRect(0, 0, this.width, this.height);
 
         // Draw ground (invisible in physics but visual here if we want, or just bottom of screen)

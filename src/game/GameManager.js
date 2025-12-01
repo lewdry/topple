@@ -20,6 +20,7 @@ export class GameManager {
 
         // Setup Ground
         this.createGround();
+        this.setupGroundResize();
 
         // Setup Walls
         this.createWalls();
@@ -40,19 +41,37 @@ export class GameManager {
     createGround() {
         const width = window.innerWidth;
         const height = window.innerHeight;
-        // Ground moved up to leave space for UI (UI is 120px, give 30px buffer)
-        // We want the top of the floor to be at height - 150.
-        this.floorTop = height - 150;
-        const groundHeight = 100;
+        // Align ground with the top of the UI layer (120px desktop, 80px mobile)
+        let uiHeight = 120;
+        if (window.innerWidth <= 800) uiHeight = 80;
+        this.floorTop = height - uiHeight;
+        const groundHeight = 20; // Make the ground thin
 
-        const ground = Matter.Bodies.rectangle(width / 2, this.floorTop + groundHeight / 2, width * 2, groundHeight, {
-            isStatic: true,
-            render: { fillStyle: '#2c3e50' },
-            label: 'Ground'
-        });
+        // Remove previous ground if it exists
+        if (this.ground) {
+            Matter.Composite.remove(this.world, this.ground);
+        }
+
+        const ground = Matter.Bodies.rectangle(
+            width / 2,
+            this.floorTop + groundHeight / 2,
+            width * 2,
+            groundHeight,
+            {
+                isStatic: true,
+                render: { fillStyle: '#626161' },
+                label: 'Ground'
+            }
+        );
 
         this.ground = ground; // Keep reference
         Matter.Composite.add(this.world, ground);
+    }
+
+    setupGroundResize() {
+        window.addEventListener('resize', () => {
+            this.createGround();
+        });
     }
 
     createWalls() {

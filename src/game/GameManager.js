@@ -21,8 +21,17 @@ export class GameManager {
         // Setup Ground
         this.createGround();
 
+        // Setup Walls
+        this.createWalls();
+
+        // Setup Ceiling
+        this.createCeiling();
+
         // Setup Mouse Interaction
         this.setupInteraction();
+
+        // Setup Events
+        this.setupEvents();
 
         // Bind UI
         this.bindUI();
@@ -33,20 +42,122 @@ export class GameManager {
         const height = window.innerHeight;
         // Ground moved up to leave space for UI (UI is 120px, give 30px buffer)
         // We want the top of the floor to be at height - 150.
-        const floorTop = height - 150;
+        this.floorTop = height - 150;
         const groundHeight = 100;
 
-        const ground = Matter.Bodies.rectangle(width / 2, floorTop + groundHeight / 2, width * 2, groundHeight, {
+        const ground = Matter.Bodies.rectangle(width / 2, this.floorTop + groundHeight / 2, width * 2, groundHeight, {
             isStatic: true,
-            render: { fillStyle: '#2c3e50' }
+            render: { fillStyle: '#2c3e50' },
+            label: 'Ground'
         });
 
         this.ground = ground; // Keep reference
         Matter.Composite.add(this.world, ground);
     }
 
+    createWalls() {
+        const width = window.innerWidth;
+        const height = window.innerHeight;
+        const wallThickness = 100;
+
+        // Left Wall
+        const leftWall = Matter.Bodies.rectangle(-wallThickness / 2, height / 2, wallThickness, height * 2, {
+            isStatic: true,
+            render: { visible: false }, // Invisible walls
+            label: 'Wall'
+        });
+
+        // Right Wall
+        const rightWall = Matter.Bodies.rectangle(width + wallThickness / 2, height / 2, wallThickness, height * 2, {
+            isStatic: true,
+            render: { visible: false },
+            label: 'Wall'
+        });
+
+        Matter.Composite.add(this.world, [leftWall, rightWall]);
+    }
+
+    createCeiling() {
+        const width = window.innerWidth;
+        const wallThickness = 100;
+
+        // Ceiling (just above the top of the screen)
+        const ceiling = Matter.Bodies.rectangle(width / 2, -wallThickness / 2, width * 2, wallThickness, {
+            isStatic: true,
+            render: { visible: false },
+            label: 'Ceiling'
+        });
+
+        Matter.Composite.add(this.world, ceiling);
+    }
+
+    setupEvents() {
+        const ESCAPE_VELOCITY = 15; // Tunable threshold
+
+        Matter.Events.on(this.engine, 'preSolve', (event) => {
+            const pairs = event.pairs;
+
+            for (let i = 0; i < pairs.length; i++) {
+                const pair = pairs[i];
+                const bodyA = pair.bodyA;
+                const bodyB = pair.bodyB;
+
+                // Check if one is a wall and the other is a block
+                let wall, block;
+                if (bodyA.label === 'Wall' && bodyB.label === 'Block') {
+                    wall = bodyA;
+                    block = bodyB;
+                } else if (bodyB.label === 'Wall' && bodyA.label === 'Block') {
+                    wall = bodyB;
+                    block = bodyA;
+                }
+
+                if (wall && block) {
+                    // Check velocity of block towards the wall
+                    // Simple check: magnitude of velocity
+                    // Or specifically x-velocity
+                    if (Math.abs(block.velocity.x) > ESCAPE_VELOCITY) {
+                        pair.isActive = false; // Disable collision
+                    }
+                }
+            }
+        });
+
+        Matter.Events.on(this.engine, 'beforeUpdate', (event) => {
+            const bodies = Matter.Composite.allBodies(this.world);
+            const width = window.innerWidth;
+            const height = window.innerHeight;
+
+            for (let i = 0; i < bodies.length; i++) {
+                const body = bodies[i];
+                if (body.isStatic) continue;
+
+                // Remove if far off screen
+                if (body.position.y > height + 200 ||
+                    body.position.x < -200 ||
+                    body.position.x > width + 200) {
+                    Matter.Composite.remove(this.world, body);
+                }
+            }
+        });
+    }
+
     setupInteraction() {
-        const mouse = Matter.Mouse.create(this.canvas);
+        // Attach mouse to the container div instead of canvas to avoid High DPI scaling issues
+        // The container is 1:1 with CSS pixels, whereas the canvas buffer is scaled by dpr.
+        const container = document.getElementById('game-container');
+        const mouse = Matter.Mouse.create(container);
+
+        // Force 1:1 mapping just in case
+        const updateMouse = () => {
+            mouse.pixelRatio = 1;
+            Matter.Mouse.setScale(mouse, { x: 1, y: 1 });
+            Matter.Mouse.setOffset(mouse, { x: 0, y: 0 });
+        };
+
+        updateMouse();
+        window.addEventListener('resize', updateMouse);
+
         const mouseConstraint = Matter.MouseConstraint.create(this.engine, {
             mouse: mouse,
             constraint: {
@@ -57,12 +168,18 @@ export class GameManager {
             }
         });
 
-        Matter.Composite.add(this.world, mouseConstraint);
+        // Prevent dragging below the floor
+        Matter.Events.on(mouseConstraint, 'mousemove', (event) => {
+            const mousePosition = event.mouse.position;
+            // Clamp Y position to be above the floor (minus a small buffer for the block size)
+            // We want to stop the mouse cursor itself from going too deep,
+            // but effectively we just want to clamp the constraint target.
+            if (this.floorTop && mousePosition.y > this.floorTop) {
+                mousePosition.y = this.floorTop;
+            }
+        });
 
-        // Keep the mouse in sync with rendering
-        // Matter.js Mouse needs pixel ratio adjustment if not handled, but usually okay with default renderer.
-        // Since we are using custom renderer, we just need to make sure we pass the mouse to it if needed, 
-        // but Matter.Mouse attaches event listeners to the element.
+        Matter.Composite.add(this.world, mouseConstraint);
     }
 
     spawnBlock(type) {

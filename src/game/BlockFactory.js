@@ -47,12 +47,12 @@ export class BlockFactory {
   createTriangle(x, y) {
     const scale = this.getScaleFactor();
     // We want height to match square size (60 * scale)
-    // Height of equilateral triangle = side * sqrt(3) / 2
-    // side = height * 2 / sqrt(3)
+    // For equilateral triangle, height = 3/2 * radius (where radius is distance from center to vertex)
+    // So radius = height * 2/3
     const targetHeight = 60 * scale;
-    const side = (targetHeight * 2) / Math.sqrt(3);
+    const radius = targetHeight * (2 / 3);
 
-    return Matter.Bodies.polygon(x, y, 3, side, {
+    return Matter.Bodies.polygon(x, y, 3, radius, {
       chamfer: { radius: 4 * scale },
       render: { fillStyle: this.getRandomColor() },
       label: 'Block'

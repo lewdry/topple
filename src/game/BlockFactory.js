@@ -53,10 +53,17 @@ export class BlockFactory {
     const targetHeight = 60 * scale;
     const radius = targetHeight * (2 / 3);
 
+    // Triangles can slide more aggressively because of point contacts.
+    // Give triangles the same basic body options as other blocks but with a slightly higher
+    // friction and a modest density to better match their physical behavior so they don't
+    // push out sideways when added rapidly.
     return Matter.Bodies.polygon(x, y, 3, radius, {
       chamfer: { radius: 4 * scale },
       render: { fillStyle: this.getRandomColor() },
-      label: 'Block'
+      label: 'Block',
+      friction: 0.4,
+      frictionStatic: 0.4,
+      density: 0.0025
     });
   }
 }

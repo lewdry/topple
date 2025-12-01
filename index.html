@@ -16,6 +16,12 @@
       font-family: 'Inter', sans-serif;
       touch-action: none;
       /* Prevent default touch actions like scrolling */
+        /* Prevent selection & touch highlights on mobile Safari */
+        -webkit-user-select: none; /* Safari */
+        -ms-user-select: none; /* IE 10+ */
+        user-select: none; /* Standard */
+        -webkit-touch-callout: none; /* Disable callout, e.g. copy menu */
+        -webkit-tap-highlight-color: transparent; /* Remove tap highlight */
     }
 
     #game-container {
@@ -65,6 +71,9 @@
       box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
       pointer-events: none;
       /* Allow clicks to pass through to canvas */
+      -webkit-user-select: none;
+      -ms-user-select: none;
+      user-select: none;
     }
 
     /* Responsive tweaks for mobile */
@@ -116,6 +125,10 @@
       align-items: center;
       transition: all 0.2s;
       position: relative;
+      -webkit-user-select: none;
+      -ms-user-select: none;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
     }
 
     .spawn-btn:active {

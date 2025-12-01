@@ -151,6 +151,33 @@ export class GameManager {
                 const body = bodies[i];
                 if (body.isStatic) continue;
 
+                // Safety: clamp angular velocity to avoid excessive spinning
+                const MAX_ANGULAR = 2.5; // rad/s -- tunable
+                if (Math.abs(body.angularVelocity) > MAX_ANGULAR) {
+                    Matter.Body.setAngularVelocity(body, Math.sign(body.angularVelocity) * MAX_ANGULAR);
+                }
+
+                // Safety: clamp linear velocity to sane bounds to prevent tunneling
+                const MAX_LINEAR = 60; // px/s
+                const vx = body.velocity.x;
+                const vy = body.velocity.y;
+                const speed = Math.sqrt(vx * vx + vy * vy);
+                if (speed > MAX_LINEAR) {
+                    const scale = MAX_LINEAR / speed;
+                    Matter.Body.setVelocity(body, { x: vx * scale, y: vy * scale });
+                }
+
+                // Force correction if a body has managed to get inside the floor area — push it above floor
+                if (this.floorTop) {
+                    const halfHeight = (body.bounds.max.y - body.bounds.min.y) / 2 || 30;
+                    const maxY = this.floorTop - halfHeight;
+                    if (body.position.y > maxY + 1) {
+                        Matter.Body.setPosition(body, { x: body.position.x, y: maxY });
+                        Matter.Body.setVelocity(body, { x: 0, y: 0 });
+                        Matter.Body.setAngularVelocity(body, 0);
+                    }
+                }
+
                 // Remove if far off screen
                 if (body.position.y > height + 200 ||
                     body.position.x < -200 ||
@@ -198,11 +225,64 @@ export class GameManager {
             }
         });
 
+        // Drag lifecycle handlers to prevent clipping / tunneling when players drag blocks
+        Matter.Events.on(mouseConstraint, 'startdrag', (event) => {
+            const body = event.body;
+            if (!body || body.label !== 'Block') return;
+
+            body._wasStaticOnDrag = !!body.isStatic;
+            // Make the block static while the user drags it so it won't get flung or tunnel
+            Matter.Body.setStatic(body, true);
+            Matter.Body.setVelocity(body, { x: 0, y: 0 });
+            Matter.Body.setAngularVelocity(body, 0);
+        });
+
+        Matter.Events.on(mouseConstraint, 'mousemove', (event) => {
+            // Keep the dragged body clamped above the floor and stable
+            const dragged = mouseConstraint.body;
+            if (!dragged || dragged.label !== 'Block') return;
+
+            const mousePosition = event.mouse.position;
+            // compute half height from body bounds
+            const halfHeight = (dragged.bounds.max.y - dragged.bounds.min.y) / 2 || 30;
+            const maxY = this.floorTop ? (this.floorTop - halfHeight) : mousePosition.y;
+
+            const targetY = Math.min(mousePosition.y, maxY);
+            Matter.Body.setPosition(dragged, { x: mousePosition.x, y: targetY });
+            Matter.Body.setVelocity(dragged, { x: 0, y: 0 });
+            Matter.Body.setAngularVelocity(dragged, 0);
+        });
+
+        Matter.Events.on(mouseConstraint, 'enddrag', (event) => {
+            const body = event.body;
+            if (!body || body.label !== 'Block') return;
+
+            // Restore static state
+            Matter.Body.setStatic(body, !!body._wasStaticOnDrag ? true : false);
+            Matter.Body.setVelocity(body, { x: 0, y: 0 });
+            Matter.Body.setAngularVelocity(body, 0);
+
+            // If the block is overlapping others or the floor after releasing, nudge it upward until clear
+            let iterations = 0;
+            while (iterations < 12) {
+                const collisions = Matter.Query.collides(body, Matter.Composite.allBodies(this.world));
+                const overlap = collisions.some(c => c.bodyA === body || c.bodyB === body);
+                if (!overlap) break;
+                Matter.Body.setPosition(body, { x: body.position.x, y: body.position.y - 6 });
+                iterations++;
+            }
+        });
+
         Matter.Composite.add(this.world, mouseConstraint);
     }
 
     spawnBlock(type) {
-        const x = window.innerWidth / 2;
+        // Add a small horizontal jitter to avoid exactly stacking multiple new blocks
+        // at the same center point — this reduces immediate contact impulses that
+        // can push thin shapes (triangles) sideways.
+        const baseX = window.innerWidth / 2;
+        const jitter = (Math.random() - 0.5) * 24; // +/- 12px
+        const x = baseX + jitter;
         // Determine UI height (matches ground logic)
         let uiHeight = 120;
         if (window.innerWidth <= 800) uiHeight = 80;
@@ -233,6 +313,20 @@ export class GameManager {
             // Set block position
             Matter.Body.setPosition(block, { x, y: Math.max(minY, Math.min(100, maxY)) });
             Matter.Composite.add(this.world, block);
+
+            // Ensure newly spawned block is not overlapping others (especially triangles) —
+            // nudge it upward until it is collision-free or we've tried a few times.
+            let tries = 0;
+            while (tries < 10) {
+                const collisions = Matter.Query.collides(block, Matter.Composite.allBodies(this.world));
+                // If any collision involves the block and some other body (excluding itself), try nudging up
+                const overlap = collisions.some(c => c.bodyA === block || c.bodyB === block);
+                if (!overlap) break;
+
+                // Nudge up by a small step to give it clear space
+                Matter.Body.setPosition(block, { x: block.position.x + (tries % 2 === 0 ? 6 : -6), y: block.position.y - 8 });
+                tries++;
+            }
         }
     }
 
@@ -248,25 +342,31 @@ export class GameManager {
 
     bindUI() {
         const buttons = document.querySelectorAll('.spawn-btn');
+        // Use pointer events (covers touch & mouse) and prevent default to avoid selection in iOS Safari
         buttons.forEach(btn => {
-            btn.addEventListener('click', (e) => {
+            btn.addEventListener('pointerdown', (e) => {
+                e.preventDefault();
                 e.stopPropagation();
                 const shape = btn.dataset.shape;
                 this.spawnBlock(shape);
-            });
+            }, { passive: false });
         });
 
         const resetBtn = document.getElementById('reset-btn');
         if (resetBtn) {
-            resetBtn.addEventListener('click', (e) => {
+            resetBtn.addEventListener('pointerdown', (e) => {
+                e.preventDefault();
                 e.stopPropagation();
                 this.clearBlocks();
-            });
+            }, { passive: false });
         }
 
-        // Prevent default touch behaviors
+        // Prevent default touch behaviors on the canvas to avoid scrolling/selection
         this.canvas.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
         this.canvas.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
+
+        // bindUI now handles pointer events for the buttons and canvas. Drag-safety handlers
+        // belong in setupInteraction where mouseConstraint exists.
     }
 
     start() {

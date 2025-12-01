@@ -20,7 +20,7 @@ export class BlockFactory {
     // Scale based on screen width, capped to avoid huge blocks on desktop
     const refWidth = 600; // Reference width for "normal" size
     const scale = Math.min(window.innerWidth, 1000) / refWidth;
-    return Math.max(scale, 0.6); // Don't get too small
+    return Math.max(scale, 0.7); // Don't get too small
   }
 
   createSquare(x, y) {

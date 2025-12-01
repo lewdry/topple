@@ -92,7 +92,7 @@ export class GameManager {
     }
 
     setupEvents() {
-        const ESCAPE_VELOCITY = 15; // Tunable threshold
+        const ESCAPE_VELOCITY = 2; // Tunable threshold
 
         Matter.Events.on(this.engine, 'preSolve', (event) => {
             const pairs = event.pairs;

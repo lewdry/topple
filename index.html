@@ -24,6 +24,30 @@
       left: 0;
       width: 100%;
       height: 100%;
+      z-index: 1;
+    }
+
+    #ui-layer {
+      z-index: 5;
+    }
+
+    #reset-btn {
+      z-index: 5;
+    }
+    #topple-title {
+      position: absolute;
+      top: 32px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+      font-size: 3rem;
+      font-weight: bold;
+      color: #626161;
+      text-align: center;
+      z-index: 20;
+      user-select: none;
+      pointer-events: none;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.08);
     }
 
     #ui-layer {
@@ -125,6 +149,8 @@
 </head>
 
 <body>
+
+  <div id="topple-title">Topple</div>
   <div id="game-container"></div>
 
   <button id="reset-btn" title="Reset Game">↻</button>

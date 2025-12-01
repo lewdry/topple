@@ -203,23 +203,35 @@ export class GameManager {
 
     spawnBlock(type) {
         const x = window.innerWidth / 2;
-        const y = 100; // Spawn near top
+        // Determine UI height (matches ground logic)
+        let uiHeight = 120;
+        if (window.innerWidth <= 800) uiHeight = 80;
+        const groundY = window.innerHeight - uiHeight;
 
-        let block;
+        // Get block size for clamping
+        let block, blockHeight = 60; // Default
         switch (type) {
             case 'square':
-                block = this.blockFactory.createSquare(x, y);
+                block = this.blockFactory.createSquare(x, 100);
+                blockHeight = 60 * this.blockFactory.getScaleFactor();
                 break;
             case 'rectangle':
-                block = this.blockFactory.createRectangle(x, y);
+                block = this.blockFactory.createRectangle(x, 100);
+                blockHeight = 40 * this.blockFactory.getScaleFactor();
                 break;
-            case 'arch': // Legacy support or if we kept it, but we are replacing with triangle
+            case 'arch':
             case 'triangle':
-                block = this.blockFactory.createTriangle(x, y);
+                block = this.blockFactory.createTriangle(x, 100);
+                blockHeight = 60 * this.blockFactory.getScaleFactor();
                 break;
         }
 
+        // Clamp Y so block bottom is above ground
         if (block) {
+            const minY = 20 + blockHeight / 2; // Don't spawn off top
+            const maxY = groundY - blockHeight / 2;
+            // Set block position
+            Matter.Body.setPosition(block, { x, y: Math.max(minY, Math.min(100, maxY)) });
             Matter.Composite.add(this.world, block);
         }
     }

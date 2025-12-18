@@ -5,23 +5,45 @@
   <meta charset="UTF-8" />
   <link rel="icon" type="image/svg+xml" href="/vite.svg" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Sniglet&display=swap" rel="stylesheet">
   <title>Topple</title>
   <style>
+    :root {
+      --bg-color: #e8f4f4;
+      --ground-color: #626161;
+
+      /* Block Palette */
+      --color-1: #FF6B6B;
+      --color-2: #4ECDC4;
+      --color-3: #fddc38;
+      --color-4: #FF9F1C;
+      --color-5: #9B5DE5;
+      --color-6: #3A86FF;
+      --color-7: #8AC926;
+    }
+
     body {
       margin: 0;
       padding: 0;
       overflow: hidden;
-      background-color: #e6edf3;
+      background-color: var(--bg-color);
       /* Soft background */
       font-family: 'Inter', sans-serif;
       touch-action: none;
       /* Prevent default touch actions like scrolling */
-        /* Prevent selection & touch highlights on mobile Safari */
-        -webkit-user-select: none; /* Safari */
-        -ms-user-select: none; /* IE 10+ */
-        user-select: none; /* Standard */
-        -webkit-touch-callout: none; /* Disable callout, e.g. copy menu */
-        -webkit-tap-highlight-color: transparent; /* Remove tap highlight */
+      /* Prevent selection & touch highlights on mobile Safari */
+      -webkit-user-select: none;
+      /* Safari */
+      -ms-user-select: none;
+      /* IE 10+ */
+      user-select: none;
+      /* Standard */
+      -webkit-touch-callout: none;
+      /* Disable callout, e.g. copy menu */
+      -webkit-tap-highlight-color: transparent;
+      /* Remove tap highlight */
     }
 
     #game-container {
@@ -40,12 +62,13 @@
     #reset-btn {
       z-index: 5;
     }
+
     #topple-title {
       position: absolute;
       top: 32px;
       left: 50%;
       transform: translateX(-50%);
-      font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+      font-family: 'Sniglet', cursive;
       font-size: 3rem;
       font-weight: bold;
       color: #626161;
@@ -53,7 +76,6 @@
       z-index: 20;
       user-select: none;
       pointer-events: none;
-      text-shadow: 0 2px 8px rgba(0,0,0,0.08);
     }
 
     #ui-layer {
@@ -83,6 +105,7 @@
         gap: 10px;
         padding-bottom: 4px;
       }
+
       .spawn-btn {
         width: 36px;
         height: 36px;
@@ -90,24 +113,28 @@
         align-self: center;
         padding: 0;
       }
+
       .shape-icon {
         display: block;
         margin: 0 auto;
       }
+
       .shape-square {
         width: 20px;
         height: 20px;
         border-radius: 3px;
       }
+
       .shape-rectangle {
         width: 28px;
         height: 10px;
         border-radius: 3px;
       }
+
       .shape-triangle {
         border-left: 10px solid transparent;
         border-right: 10px solid transparent;
-        border-bottom: 18px solid #FFE66D;
+        border-bottom: 18px solid var(--color-3);
       }
     }
 
@@ -150,14 +177,14 @@
     .shape-square {
       width: 40px;
       height: 40px;
-      background: #FF6B6B;
+      background: var(--color-1);
       border-radius: 4px;
     }
 
     .shape-rectangle {
       width: 50px;
       height: 25px;
-      background: #4ECDC4;
+      background: var(--color-2);
       border-radius: 4px;
     }
 
@@ -166,7 +193,7 @@
       height: 0;
       border-left: 25px solid transparent;
       border-right: 25px solid transparent;
-      border-bottom: 40px solid #FFE66D;
+      border-bottom: 40px solid var(--color-3);
       background: transparent;
     }
 

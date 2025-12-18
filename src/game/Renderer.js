@@ -7,7 +7,8 @@ export class Renderer {
         this.ctx = canvas.getContext('2d');
         this.handleResize(); // Initialize size
 
-        window.addEventListener('resize', () => this.handleResize());
+        this.boundResizeHandler = () => this.handleResize();
+        window.addEventListener('resize', this.boundResizeHandler);
     }
 
     handleResize() {
@@ -27,9 +28,31 @@ export class Renderer {
         this.ctx.scale(dpr, dpr);
     }
 
+    start() {
+        if (!this.isRunning) {
+            this.isRunning = true;
+            this.render();
+        }
+    }
+
+    stop() {
+        this.isRunning = false;
+        if (this.animationFrameId) {
+            cancelAnimationFrame(this.animationFrameId);
+            this.animationFrameId = null;
+        }
+    }
+
+    destroy() {
+        this.stop();
+        window.removeEventListener('resize', this.boundResizeHandler);
+    }
+
     render() {
+        if (!this.isRunning) return;
+
         // Clear canvas
-        this.ctx.fillStyle = '#e6edf3';
+        this.ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--bg-color').trim() || '#e6edf3';
         this.ctx.fillRect(0, 0, this.width, this.height);
 
         // Draw ground (invisible in physics but visual here if we want, or just bottom of screen)
@@ -72,10 +95,6 @@ export class Renderer {
             }
         }
 
-        requestAnimationFrame(() => this.render());
-    }
-
-    start() {
-        this.render();
+        this.animationFrameId = requestAnimationFrame(() => this.render());
     }
 }

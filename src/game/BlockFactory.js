@@ -2,14 +2,19 @@ import Matter from 'matter-js';
 
 export class BlockFactory {
   constructor() {
+    // Read palette from CSS variables
+    // Read palette from CSS variables (use documentElement to ensure we get :root vars)
+    const style = getComputedStyle(document.documentElement);
+    const getColor = (name) => style.getPropertyValue(name).trim() || '#000000'; // Fallback to black if missing
+
     this.palette = [
-      '#FF6B6B', // Red
-      '#4ECDC4', // Teal
-      '#FFE66D', // Yellow
-      '#FF9F1C', // Orange
-      '#9B5DE5', // Purple
-      '#3A86FF', // Bright Blue
-      '#8AC926'  // Lime Green
+      getColor('--color-1'),
+      getColor('--color-2'),
+      getColor('--color-3'),
+      getColor('--color-4'),
+      getColor('--color-5'),
+      getColor('--color-6'),
+      getColor('--color-7')
     ];
   }
 
@@ -30,7 +35,8 @@ export class BlockFactory {
     return Matter.Bodies.rectangle(x, y, size, size, {
       chamfer: { radius: 4 * scale },
       render: { fillStyle: this.getRandomColor() },
-      label: 'Block'
+      label: 'Block',
+      frictionAir: 0.001
     });
   }
 
@@ -41,7 +47,8 @@ export class BlockFactory {
     return Matter.Bodies.rectangle(x, y, width, height, {
       chamfer: { radius: 4 * scale },
       render: { fillStyle: this.getRandomColor() },
-      label: 'Block'
+      label: 'Block',
+      frictionAir: 0.001
     });
   }
 
@@ -63,6 +70,7 @@ export class BlockFactory {
       label: 'Block',
       friction: 0.4,
       frictionStatic: 0.4,
+      frictionAir: 0.001, // Low air resistance for consistent fall
       density: 0.0025
     });
   }

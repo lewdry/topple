@@ -59,7 +59,7 @@ export class GameManager {
             groundHeight,
             {
                 isStatic: true,
-                render: { fillStyle: '#626161' },
+                render: { fillStyle: getComputedStyle(document.body).getPropertyValue('--ground-color').trim() },
                 label: 'Ground'
             }
         );
@@ -69,9 +69,36 @@ export class GameManager {
     }
 
     setupGroundResize() {
-        window.addEventListener('resize', () => {
+        this.boundResizeHandler = () => {
             this.createGround();
-        });
+        };
+        window.addEventListener('resize', this.boundResizeHandler);
+    }
+
+    destroy() {
+        // Cleanup resize listener
+        if (this.boundResizeHandler) {
+            window.removeEventListener('resize', this.boundResizeHandler);
+        }
+
+        // Cleanup Renderer
+        if (this.renderer) {
+            this.renderer.destroy();
+        }
+
+        // Cleanup Matter Engine
+        if (this.runner) {
+            Matter.Runner.stop(this.runner);
+        }
+        if (this.engine) {
+            Matter.World.clear(this.engine.world);
+            Matter.Engine.clear(this.engine);
+        }
+
+        // Remove canvas
+        if (this.canvas && this.canvas.parentNode) {
+            this.canvas.parentNode.removeChild(this.canvas);
+        }
     }
 
     createWalls() {
@@ -111,7 +138,7 @@ export class GameManager {
     }
 
     setupEvents() {
-        const ESCAPE_VELOCITY = 2; // Tunable threshold
+        const ESCAPE_VELOCITY = 1; // Tunable threshold
 
         Matter.Events.on(this.engine, 'preSolve', (event) => {
             const pairs = event.pairs;
@@ -158,7 +185,8 @@ export class GameManager {
                 }
 
                 // Safety: clamp linear velocity to sane bounds to prevent tunneling
-                const MAX_LINEAR = 60; // px/s
+                // Increased from 60 to 200 to prevent artificial "braking" / deceleration feel
+                const MAX_LINEAR = 200; // px/s (per tick approx)
                 const vx = body.velocity.x;
                 const vy = body.velocity.y;
                 const speed = Math.sqrt(vx * vx + vy * vy);
@@ -169,12 +197,17 @@ export class GameManager {
 
                 // Force correction if a body has managed to get inside the floor area — push it above floor
                 if (this.floorTop) {
-                    const halfHeight = (body.bounds.max.y - body.bounds.min.y) / 2 || 30;
-                    const maxY = this.floorTop - halfHeight;
-                    if (body.position.y > maxY + 1) {
-                        Matter.Body.setPosition(body, { x: body.position.x, y: maxY });
-                        Matter.Body.setVelocity(body, { x: 0, y: 0 });
-                        Matter.Body.setAngularVelocity(body, 0);
+                    const penetration = body.bounds.max.y - this.floorTop;
+                    // Allow a tiny bit of slop (1px) before hard correcting, so we don't fight the physics engine continuously
+                    if (penetration > 1) {
+                        // Move body up by the penetration amount
+                        Matter.Body.translate(body, { x: 0, y: -penetration });
+
+                        // Dampen velocity to prevent energy accumulation, but don't freeze it completely
+                        // Just kill vertical velocity if it's going down
+                        if (body.velocity.y > 0) {
+                            Matter.Body.setVelocity(body, { x: body.velocity.x, y: 0 });
+                        }
                     }
                 }
 
@@ -225,6 +258,32 @@ export class GameManager {
             }
         });
 
+        // State for fling mechanics
+        let lastDragPos = { x: 0, y: 0 };
+        let dragVelocity = { x: 0, y: 0 };
+
+        // Track velocity every frame for smoother flinging
+        Matter.Events.on(this.engine, 'afterUpdate', () => {
+            if (!mouseConstraint.body) return;
+
+            const mousePos = mouseConstraint.mouse.position;
+            const body = mouseConstraint.body;
+
+            // Replicate the clamping logic to get the true physical target position
+            const halfHeight = (body.bounds.max.y - body.bounds.min.y) / 2 || 30;
+            const maxY = this.floorTop ? (this.floorTop - halfHeight) : mousePos.y;
+            const targetY = Math.min(mousePos.y, maxY);
+            const currentPos = { x: mousePos.x, y: targetY };
+
+            // Calculate velocity (px per tick)
+            dragVelocity = {
+                x: currentPos.x - lastDragPos.x,
+                y: currentPos.y - lastDragPos.y
+            };
+
+            lastDragPos = currentPos;
+        });
+
         // Drag lifecycle handlers to prevent clipping / tunneling when players drag blocks
         Matter.Events.on(mouseConstraint, 'startdrag', (event) => {
             const body = event.body;
@@ -235,6 +294,11 @@ export class GameManager {
             Matter.Body.setStatic(body, true);
             Matter.Body.setVelocity(body, { x: 0, y: 0 });
             Matter.Body.setAngularVelocity(body, 0);
+
+            // Reset tracking
+            const mousePos = event.mouse.position;
+            lastDragPos = { x: mousePos.x, y: mousePos.y };
+            dragVelocity = { x: 0, y: 0 };
         });
 
         Matter.Events.on(mouseConstraint, 'mousemove', (event) => {
@@ -249,8 +313,11 @@ export class GameManager {
 
             const targetY = Math.min(mousePosition.y, maxY);
             Matter.Body.setPosition(dragged, { x: mousePosition.x, y: targetY });
-            Matter.Body.setVelocity(dragged, { x: 0, y: 0 });
-            Matter.Body.setAngularVelocity(dragged, 0);
+
+            // Do NOT zero velocity here if we weren't static, but since we are static, it doesn't matter much.
+            // However, ensuring 0 is good hygiene if it were dynamic. 
+            // We do not setVelocity(0) here because we want to preserve the illusion of movement? 
+            // Actually, because it is Static, setVelocity does nothing.
         });
 
         Matter.Events.on(mouseConstraint, 'enddrag', (event) => {
@@ -259,7 +326,18 @@ export class GameManager {
 
             // Restore static state
             Matter.Body.setStatic(body, !!body._wasStaticOnDrag ? true : false);
-            Matter.Body.setVelocity(body, { x: 0, y: 0 });
+
+            // Apply Fling Velocity
+            // We apply it *after* making it dynamic again.
+            if (!body.isStatic) {
+                Matter.Body.setVelocity(body, {
+                    x: dragVelocity.x,
+                    y: dragVelocity.y
+                });
+            } else {
+                Matter.Body.setVelocity(body, { x: 0, y: 0 });
+            }
+
             Matter.Body.setAngularVelocity(body, 0);
 
             // If the block is overlapping others or the floor after releasing, nudge it upward until clear
